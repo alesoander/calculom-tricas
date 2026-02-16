@@ -334,21 +334,21 @@ function displayInstanceDetails() {
 function getConversionHTML(instanceName, quotes) {
     const data = instancesData[instanceName];
     
-    const rate1 = data.total > 0 
-        ? ((quotes / data.total) * 100).toFixed(2)
+    const rate1 = quotes > 0 
+        ? ((data.total / quotes) * 100).toFixed(2)
         : '0.00';
     
-    const rate2 = data.confirmada > 0 
-        ? ((quotes / data.confirmada) * 100).toFixed(2)
+    const rate2 = quotes > 0 
+        ? ((data.confirmada / quotes) * 100).toFixed(2)
         : '0.00';
 
     return `
         <div class="conversion-result-item">
-            <span class="conversion-result-label">Cotizaciones / Total Reservas:</span>
+            <span class="conversion-result-label">Total Reservas / Cotizaciones:</span>
             <span class="conversion-result-value">${rate1}%</span>
         </div>
         <div class="conversion-result-item">
-            <span class="conversion-result-label">Cotizaciones / Confirmadas:</span>
+            <span class="conversion-result-label">Confirmadas / Cotizaciones:</span>
             <span class="conversion-result-value">${rate2}%</span>
         </div>
     `;
@@ -856,8 +856,8 @@ async function addPDFInstanceDetails(doc, y) {
         
         // Quote information
         const quotes = quotesData[instanceName] || 0;
-        const rate1 = data.total > 0 ? ((quotes / data.total) * 100).toFixed(2) : '0.00';
-        const rate2 = data.confirmada > 0 ? ((quotes / data.confirmada) * 100).toFixed(2) : '0.00';
+        const rate1 = quotes > 0 ? ((data.total / quotes) * 100).toFixed(2) : '0.00';
+        const rate2 = quotes > 0 ? ((data.confirmada / quotes) * 100).toFixed(2) : '0.00';
         
         doc.setFillColor(245, 247, 250);
         doc.rect(15, y - 5, 180, 20, 'F');
@@ -872,7 +872,7 @@ async function addPDFInstanceDetails(doc, y) {
         
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(127, 140, 141);
-        doc.text('Cotizaciones / Total Reservas:', 17, y);
+        doc.text('Total Reservas / Cotizaciones:', 17, y);
         doc.setFont('helvetica', 'bold');
         doc.text(`${rate1}%`, 190, y, { align: 'right' });
         
@@ -880,7 +880,7 @@ async function addPDFInstanceDetails(doc, y) {
         
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(127, 140, 141);
-        doc.text('Cotizaciones / Confirmadas:', 17, y);
+        doc.text('Confirmadas / Cotizaciones:', 17, y);
         doc.setFont('helvetica', 'bold');
         doc.text(`${rate2}%`, 190, y, { align: 'right' });
         
