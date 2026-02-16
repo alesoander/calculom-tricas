@@ -410,10 +410,9 @@ function applyDateFilter() {
         let rowDate;
         // Handle both string dates and Excel numeric dates
         if (typeof fechaCreacion === 'number') {
-            // Excel serial date number - convert to JavaScript Date in UTC
-            const utcDate = new Date(Date.UTC(1899, 11, 30)); // Excel epoch
-            utcDate.setUTCDate(utcDate.getUTCDate() + Math.floor(fechaCreacion));
-            rowDate = utcDate;
+            // Excel serial date - use standard conversion formula
+            // This works correctly for all modern dates (post-1900)
+            rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
         } else if (typeof fechaCreacion === 'string') {
             // Parse date format "2026-02-16 12:14:21" - extract date part only
             const datePart = fechaCreacion.split(' ')[0]; // Get "2026-02-16"
@@ -435,10 +434,12 @@ function applyDateFilter() {
     const filterStatus = document.getElementById('filterStatus');
     filterStatus.classList.remove('hidden');
     filterStatus.innerHTML = `
-        <span class="filter-active-icon">✅</span>
-        Mostrando <strong>${reservationData.length}</strong> reservas del 
-        <strong>${startDateInput}</strong> al <strong>${endDateInput}</strong>
+        <span class="filter-active-icon" aria-hidden="true">✅</span>
+        <span>Mostrando <strong>${reservationData.length}</strong> reservas del 
+        <strong>${startDateInput}</strong> al <strong>${endDateInput}</strong></span>
     `;
+    filterStatus.setAttribute('role', 'status');
+    filterStatus.setAttribute('aria-live', 'polite');
     
     // Reprocess and display filtered data
     processReservations();
