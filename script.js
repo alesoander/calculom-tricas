@@ -390,8 +390,9 @@ function applyDateFilter() {
         return;
     }
     
-    const startDate = new Date(startDateInput + 'T00:00:00Z');
-    const endDate = new Date(endDateInput + 'T23:59:59Z');
+    // Parse dates in local timezone
+    const startDate = new Date(startDateInput + 'T00:00:00');
+    const endDate = new Date(endDateInput + 'T23:59:59');
     
     if (startDate > endDate) {
         showError('La fecha "Desde" debe ser anterior a la fecha "Hasta"');
@@ -403,20 +404,20 @@ function applyDateFilter() {
     dateFilter.startDate = startDate;
     dateFilter.endDate = endDate;
     
-    // Filter the data
-    reservationData = originalReservationData.filter(row => {
+    // Filter the data - store in temp variable first for validation
+    const filteredData = originalReservationData.filter(row => {
         const fechaCreacion = row.Z; // Column Z
         if (!fechaCreacion) return false;
         
         let rowDate;
         // Handle both string dates and Excel serial numbers
         if (typeof fechaCreacion === 'number') {
-            // Excel serial date: days since 1900-01-01
+            // Excel serial date: days since 1900-01-01 (25569 is the difference between Excel epoch and Unix epoch in days)
             rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
         } else if (typeof fechaCreacion === 'string') {
-            // String format: "2026-02-16 12:14:21"
+            // String format: "2026-02-16 12:14:21" - parse in local timezone
             const datePart = fechaCreacion.split(' ')[0];
-            rowDate = new Date(datePart + 'T00:00:00Z');
+            rowDate = new Date(datePart + 'T00:00:00');
         } else {
             return false;
         }
@@ -424,12 +425,15 @@ function applyDateFilter() {
         return rowDate >= startDate && rowDate <= endDate;
     });
     
-    if (reservationData.length === 0) {
+    // Validate filtered results before applying
+    if (filteredData.length === 0) {
         showError('No se encontraron reservas en el rango de fechas seleccionado');
-        reservationData = [...originalReservationData];
         dateFilter.active = false;
         return;
     }
+    
+    // Apply the filtered data
+    reservationData = filteredData;
     
     // Show filter status
     const filterStatus = document.getElementById('filterStatus');
