@@ -5,6 +5,7 @@ Sistema web para cargar y analizar archivos Excel con datos de reservas, proporc
 ## 🚀 Características
 
 - **Carga de Archivos Excel**: Interfaz drag-and-drop para cargar archivos .xlsx y .xls
+- **📅 Filtro por Fecha**: Filtra reservas por rango de fechas de creación (Columna Z)
 - **Análisis por Instancia**: Desglose completo de reservas por estado (Confirmada, Pendiente, Fallida, Procesando)
 - **Métricas de Conversión**: Cálculo de tasas de conversión cotizaciones/reservas
 - **Top 5 Ranking**: Visualización de las instancias con más ventas
@@ -42,7 +43,7 @@ El archivo Excel debe contener las siguientes columnas:
 | W | ID Canal Reserva |
 | X | Source |
 | Y | Creado Por |
-| Z | Fecha Creación |
+| Z | **Fecha Creación** (usado para filtros de fecha) |
 | AA | Fecha Actualización |
 
 ## 🛠️ Instalación
@@ -81,17 +82,31 @@ Luego visita `http://localhost:8000` en tu navegador.
 ## 📖 Uso
 
 1. **Cargar Archivo**: Haz clic en "Seleccionar Archivo" o arrastra tu Excel a la zona de carga
-2. **Ver Resumen**: Revisa las estadísticas generales de todas las instancias
-3. **Top 5**: Identifica las instancias con mejor rendimiento
-4. **Ingresar Cotizaciones**: Para cada instancia, ingresa el número de cotizaciones
-5. **Ver Conversiones**: El sistema calculará automáticamente las tasas de conversión
-6. **📄 Exportar PDF**: Haz clic en el botón "Exportar PDF" para generar un reporte completo
+2. **📅 Filtrar por Fecha (Opcional)**: Usa el filtro de rango de fechas para analizar períodos específicos
+   - Selecciona fecha de inicio ("Desde") y fecha final ("Hasta")
+   - Haz clic en "Aplicar Filtro" para ver solo las reservas en ese rango
+   - Usa "Limpiar Filtro" para restaurar todos los datos
+3. **Ver Resumen**: Revisa las estadísticas generales de todas las instancias (o filtradas)
+4. **Top 5**: Identifica las instancias con mejor rendimiento
+5. **Ingresar Cotizaciones**: Para cada instancia, ingresa el número de cotizaciones
+6. **Ver Conversiones**: El sistema calculará automáticamente las tasas de conversión
+7. **📄 Exportar PDF**: Haz clic en el botón "Exportar PDF" para generar un reporte completo
+
+### 📅 Filtro por Fecha
+
+El sistema incluye un filtro de rango de fechas que permite:
+
+- **Filtrar por Fecha de Creación**: Analiza reservas creadas en un período específico (Columna Z)
+- **Formato Flexible**: Soporta fechas en formato de texto y números de serie de Excel
+- **Actualización en Tiempo Real**: Todas las estadísticas, gráficos y métricas se actualizan automáticamente
+- **Integración con PDF**: Los reportes PDF incluyen información del filtro aplicado
+- **Validación**: El sistema valida que existan resultados antes de aplicar el filtro
 
 ### 📥 Exportación de PDF
 
 El sistema permite generar reportes PDF profesionales que incluyen:
 
-- **Cabecera**: Título del reporte, fecha de generación y nombre del archivo cargado
+- **Cabecera**: Título del reporte, fecha de generación, nombre del archivo cargado y rango de filtro (si aplica)
 - **Resumen General**: Todas las estadísticas globales (total reservas, confirmadas, pendientes, fallidas, procesando, instancias)
 - **Top 5 Instancias**: Gráfico visual y tabla con las 5 instancias con más ventas
 - **Tasas de Conversión Globales**: Total de cotizaciones y porcentajes de conversión
