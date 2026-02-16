@@ -390,6 +390,7 @@ function applyDateFilter() {
     
     const startDate = new Date(startDateInput);
     const endDate = new Date(endDateInput);
+    endDate.setHours(23, 59, 59, 999); // Include all reservations on end date
     
     if (startDate > endDate) {
         showError('La fecha "Desde" debe ser anterior a la fecha "Hasta"');
@@ -406,9 +407,18 @@ function applyDateFilter() {
         const fechaCreacion = row.Z; // Column Z: Fecha Creación
         if (!fechaCreacion) return false;
         
-        // Parse date format "2026-02-16 12:14:21"
-        const datePart = fechaCreacion.split(' ')[0]; // Get "2026-02-16"
-        const rowDate = new Date(datePart);
+        let rowDate;
+        // Handle both string dates and Excel numeric dates
+        if (typeof fechaCreacion === 'number') {
+            // Excel serial date number - convert to JavaScript Date
+            rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
+        } else if (typeof fechaCreacion === 'string') {
+            // Parse date format "2026-02-16 12:14:21"
+            const datePart = fechaCreacion.split(' ')[0]; // Get "2026-02-16"
+            rowDate = new Date(datePart);
+        } else {
+            return false;
+        }
         
         return rowDate >= startDate && rowDate <= endDate;
     });
@@ -425,7 +435,7 @@ function applyDateFilter() {
     filterStatus.innerHTML = `
         <span class="filter-active-icon">✅</span>
         Mostrando <strong>${reservationData.length}</strong> reservas del 
-        <strong>${formatDate(startDate)}</strong> al <strong>${formatDate(endDate)}</strong>
+        <strong>${startDateInput}</strong> al <strong>${endDateInput}</strong>
     `;
     
     // Reprocess and display filtered data
@@ -456,11 +466,4 @@ function clearDateFilter() {
     displayResults();
     
     hideError();
-}
-
-function formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
 }
