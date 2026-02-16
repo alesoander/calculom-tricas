@@ -388,9 +388,9 @@ function applyDateFilter() {
         return;
     }
     
-    const startDate = new Date(startDateInput);
-    const endDate = new Date(endDateInput);
-    endDate.setHours(23, 59, 59, 999); // Include all reservations on end date
+    // Create dates at midnight UTC for consistent comparison
+    const startDate = new Date(startDateInput + 'T00:00:00Z');
+    const endDate = new Date(endDateInput + 'T23:59:59Z');
     
     if (startDate > endDate) {
         showError('La fecha "Desde" debe ser anterior a la fecha "Hasta"');
@@ -410,12 +410,14 @@ function applyDateFilter() {
         let rowDate;
         // Handle both string dates and Excel numeric dates
         if (typeof fechaCreacion === 'number') {
-            // Excel serial date number - convert to JavaScript Date
-            rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
+            // Excel serial date number - convert to JavaScript Date in UTC
+            const utcDate = new Date(Date.UTC(1899, 11, 30)); // Excel epoch
+            utcDate.setUTCDate(utcDate.getUTCDate() + Math.floor(fechaCreacion));
+            rowDate = utcDate;
         } else if (typeof fechaCreacion === 'string') {
-            // Parse date format "2026-02-16 12:14:21"
+            // Parse date format "2026-02-16 12:14:21" - extract date part only
             const datePart = fechaCreacion.split(' ')[0]; // Get "2026-02-16"
-            rowDate = new Date(datePart);
+            rowDate = new Date(datePart + 'T00:00:00Z'); // Parse as UTC
         } else {
             return false;
         }
