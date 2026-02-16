@@ -356,3 +356,505 @@ function showError(message) {
 function hideError() {
     errorMessage.classList.add('hidden');
 }
+
+// ============================================
+// PDF Export Functionality
+// ============================================
+
+let currentFileName = '';
+
+// Update file name when file is selected
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        currentFileName = file.name;
+    }
+});
+
+// PDF Export main function
+async function exportToPDF() {
+    try {
+        showExportLoading();
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        let yPosition = 20;
+        
+        // Add header
+        yPosition = addPDFHeader(doc, yPosition);
+        
+        // Add overall summary
+        yPosition = addPDFSummary(doc, yPosition);
+        
+        // Check if we need a new page
+        if (yPosition > 240) {
+            doc.addPage();
+            yPosition = 20;
+        }
+        
+        // Capture and add chart
+        yPosition = await addPDFChart(doc, yPosition);
+        
+        // Add Top 5 table
+        yPosition = addPDFTop5Table(doc, yPosition);
+        
+        // Add global conversion
+        yPosition = addPDFGlobalConversion(doc, yPosition);
+        
+        // Add instance details
+        yPosition = await addPDFInstanceDetails(doc, yPosition);
+        
+        // Add footer to all pages
+        addPDFFooter(doc);
+        
+        // Generate filename and download
+        const filename = `reporte-reservas-${getFormattedDateTime()}.pdf`;
+        doc.save(filename);
+        
+        hideExportLoading();
+        showSuccessMessage('PDF generado exitosamente');
+        
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        hideExportLoading();
+        showError('Error al generar PDF: ' + error.message);
+    }
+}
+
+// Helper function to add PDF header
+function addPDFHeader(doc, y) {
+    // Title
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(74, 144, 226);
+    doc.text('Análisis de Reservas - Reporte', 105, y, { align: 'center' });
+    
+    y += 10;
+    
+    // Generation date
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    const now = new Date();
+    const dateStr = `Generado el: ${now.toLocaleDateString('es-ES')} a las ${now.toLocaleTimeString('es-ES')}`;
+    doc.text(dateStr, 105, y, { align: 'center' });
+    
+    y += 6;
+    
+    // File name
+    if (currentFileName) {
+        doc.text(`Archivo: ${currentFileName}`, 105, y, { align: 'center' });
+        y += 6;
+    }
+    
+    y += 5;
+    
+    // Line separator
+    doc.setDrawColor(74, 144, 226);
+    doc.setLineWidth(0.5);
+    doc.line(15, y, 195, y);
+    
+    y += 10;
+    
+    return y;
+}
+
+// Helper function to add overall summary
+function addPDFSummary(doc, y) {
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('📈 Resumen General', 15, y);
+    
+    y += 8;
+    
+    const totalReservations = parseInt(document.getElementById('totalReservations').textContent);
+    const totalConfirmed = parseInt(document.getElementById('totalConfirmed').textContent);
+    const totalPending = parseInt(document.getElementById('totalPending').textContent);
+    const totalFailed = parseInt(document.getElementById('totalFailed').textContent);
+    const totalProcessing = parseInt(document.getElementById('totalProcessing').textContent);
+    const totalInstances = parseInt(document.getElementById('totalInstances').textContent);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const summaryData = [
+        { label: 'Total Reservas:', value: totalReservations, color: [74, 144, 226] },
+        { label: 'Reservas Confirmadas:', value: totalConfirmed, color: [39, 174, 96] },
+        { label: 'Reservas Pendientes:', value: totalPending, color: [243, 156, 18] },
+        { label: 'Reservas Fallidas:', value: totalFailed, color: [231, 76, 60] },
+        { label: 'Reservas Procesando:', value: totalProcessing, color: [155, 89, 182] },
+        { label: 'Total Instancias:', value: totalInstances, color: [74, 144, 226] }
+    ];
+    
+    summaryData.forEach((item, index) => {
+        const xLeft = 15 + (index % 2) * 90;
+        const yRow = y + Math.floor(index / 2) * 12;
+        
+        // Box background
+        doc.setFillColor(245, 247, 250);
+        doc.rect(xLeft, yRow - 5, 85, 10, 'F');
+        
+        // Label
+        doc.setTextColor(127, 140, 141);
+        doc.text(item.label, xLeft + 2, yRow);
+        
+        // Value
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...item.color);
+        doc.text(item.value.toString(), xLeft + 80, yRow, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+    });
+    
+    y += 45;
+    
+    return y;
+}
+
+// Helper function to capture and add chart
+async function addPDFChart(doc, y) {
+    try {
+        // Check if we need a new page
+        if (y > 180) {
+            doc.addPage();
+            y = 20;
+        }
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('🏆 Top 5 Instancias con Más Ventas', 15, y);
+        
+        y += 8;
+        
+        const canvas = document.getElementById('top5Chart');
+        if (canvas) {
+            // Capture the chart using html2canvas
+            const chartImage = await html2canvas(canvas, {
+                backgroundColor: '#ffffff',
+                scale: 2
+            });
+            
+            const imgData = chartImage.toDataURL('image/png');
+            
+            // Add image to PDF
+            const imgWidth = 180;
+            const imgHeight = (chartImage.height * imgWidth) / chartImage.width;
+            
+            doc.addImage(imgData, 'PNG', 15, y, imgWidth, imgHeight);
+            
+            y += imgHeight + 5;
+        }
+        
+        return y;
+    } catch (error) {
+        console.error('Error adding chart to PDF:', error);
+        y += 10;
+        doc.setFontSize(10);
+        doc.setTextColor(231, 76, 60);
+        doc.text('(Error al cargar gráfico)', 15, y);
+        return y + 10;
+    }
+}
+
+// Helper function to add Top 5 table
+function addPDFTop5Table(doc, y) {
+    const sortedInstances = Object.values(instancesData)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+    
+    if (sortedInstances.length === 0) return y;
+    
+    // Check if we need a new page
+    if (y > 220) {
+        doc.addPage();
+        y = 20;
+    }
+    
+    y += 5;
+    
+    // Table header
+    doc.setFillColor(74, 144, 226);
+    doc.rect(15, y - 5, 180, 8, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Rank', 20, y);
+    doc.text('Instancia', 40, y);
+    doc.text('Total Reservas', 170, y, { align: 'right' });
+    
+    y += 8;
+    
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    
+    sortedInstances.forEach((instance, index) => {
+        if (y > 270) {
+            doc.addPage();
+            y = 20;
+        }
+        
+        // Alternating row colors
+        if (index % 2 === 0) {
+            doc.setFillColor(245, 247, 250);
+            doc.rect(15, y - 5, 180, 8, 'F');
+        }
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(74, 144, 226);
+        doc.text(`#${index + 1}`, 20, y);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const nameText = truncateText(instance.name, 40);
+        doc.text(nameText, 40, y);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(39, 174, 96);
+        doc.text(instance.total.toString(), 170, y, { align: 'right' });
+        
+        y += 8;
+    });
+    
+    y += 5;
+    
+    return y;
+}
+
+// Helper function to add global conversion rates
+function addPDFGlobalConversion(doc, y) {
+    // Check if we need a new page
+    if (y > 240) {
+        doc.addPage();
+        y = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('📊 Tasas de Conversión Globales', 15, y);
+    
+    y += 8;
+    
+    const totalQuotes = parseInt(document.getElementById('totalQuotes').value) || 0;
+    const globalConversionRate = document.getElementById('globalConversionRate').textContent;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Total de Cotizaciones
+    doc.setFillColor(245, 247, 250);
+    doc.rect(15, y - 5, 180, 10, 'F');
+    doc.setTextColor(127, 140, 141);
+    doc.text('Total de Cotizaciones:', 17, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(74, 144, 226);
+    doc.text(totalQuotes.toString(), 190, y, { align: 'right' });
+    
+    y += 12;
+    
+    // Conversion Rate
+    doc.setFont('helvetica', 'normal');
+    doc.setFillColor(245, 247, 250);
+    doc.rect(15, y - 5, 180, 10, 'F');
+    doc.setTextColor(127, 140, 141);
+    doc.text('Total Cotizaciones / Total Confirmadas:', 17, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(74, 144, 226);
+    doc.text(globalConversionRate, 190, y, { align: 'right' });
+    
+    y += 15;
+    
+    return y;
+}
+
+// Helper function to add instance details
+async function addPDFInstanceDetails(doc, y) {
+    // Check if we need a new page
+    if (y > 240) {
+        doc.addPage();
+        y = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('🏢 Detalles por Instancia', 15, y);
+    
+    y += 10;
+    
+    // Sort instances by total reservations
+    const sortedInstances = Object.entries(instancesData)
+        .sort(([, a], [, b]) => b.total - a.total);
+    
+    for (const [instanceName, data] of sortedInstances) {
+        // Check if we need a new page
+        if (y > 230) {
+            doc.addPage();
+            y = 20;
+        }
+        
+        // Instance name and total
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(74, 144, 226);
+        const nameText = truncateText(data.name, 50);
+        doc.text(`🏢 ${nameText}`, 15, y);
+        doc.text(`Total: ${data.total}`, 190, y, { align: 'right' });
+        
+        y += 8;
+        
+        // Status breakdown
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        const statusData = [
+            { label: 'Confirmada:', value: data.confirmada, color: [39, 174, 96], emoji: '✅' },
+            { label: 'Pendiente:', value: data.pendiente, color: [243, 156, 18], emoji: '⏳' },
+            { label: 'Fallida:', value: data.fallida, color: [231, 76, 60], emoji: '❌' },
+            { label: 'Procesando:', value: data.procesando, color: [155, 89, 182], emoji: '🔄' }
+        ];
+        
+        statusData.forEach((status, index) => {
+            const xPos = 20 + (index % 2) * 90;
+            const yPos = y + Math.floor(index / 2) * 8;
+            
+            doc.setTextColor(127, 140, 141);
+            doc.text(`${status.emoji} ${status.label}`, xPos, yPos);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...status.color);
+            doc.text(status.value.toString(), xPos + 80, yPos, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+        });
+        
+        y += 20;
+        
+        // Quote information
+        const quotes = quotesData[instanceName] || 0;
+        const rate1 = data.total > 0 ? ((quotes / data.total) * 100).toFixed(2) : '0.00';
+        const rate2 = data.confirmada > 0 ? ((quotes / data.confirmada) * 100).toFixed(2) : '0.00';
+        
+        doc.setFillColor(245, 247, 250);
+        doc.rect(15, y - 5, 180, 20, 'F');
+        
+        doc.setTextColor(127, 140, 141);
+        doc.text('💼 Cantidad de Cotizaciones:', 17, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(74, 144, 226);
+        doc.text(quotes.toString(), 190, y, { align: 'right' });
+        
+        y += 6;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(127, 140, 141);
+        doc.text('Cotizaciones / Total Reservas:', 17, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${rate1}%`, 190, y, { align: 'right' });
+        
+        y += 6;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(127, 140, 141);
+        doc.text('Cotizaciones / Confirmadas:', 17, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${rate2}%`, 190, y, { align: 'right' });
+        
+        y += 12;
+        
+        // Separator line
+        doc.setDrawColor(225, 232, 237);
+        doc.setLineWidth(0.3);
+        doc.line(15, y, 195, y);
+        
+        y += 8;
+    }
+    
+    return y;
+}
+
+// Helper function to add footer to all pages
+function addPDFFooter(doc) {
+    const pageCount = doc.internal.getNumberOfPages();
+    const pageHeight = doc.internal.pageSize.height;
+    
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(150, 150, 150);
+        
+        // Page number
+        doc.text(`Página ${i} de ${pageCount}`, 105, pageHeight - 10, { align: 'center' });
+        
+        // Generation info
+        const now = new Date();
+        const timestamp = `Generado: ${now.toLocaleDateString('es-ES')} ${now.toLocaleTimeString('es-ES')}`;
+        doc.text(timestamp, 15, pageHeight - 10);
+        
+        // Branding
+        doc.text('Generado por Calculom-tricas', 195, pageHeight - 10, { align: 'right' });
+    }
+}
+
+// Helper function to get formatted date time for filename
+function getFormattedDateTime() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}-${hours}${minutes}${seconds}`;
+}
+
+// Helper function to show export loading
+function showExportLoading() {
+    const btn = document.getElementById('exportPdfBtn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+    
+    const icon = btn.querySelector('.btn-icon');
+    const text = btn.querySelector('.btn-text');
+    
+    icon.textContent = '⏳';
+    text.textContent = 'Generando PDF...';
+}
+
+// Helper function to hide export loading
+function hideExportLoading() {
+    const btn = document.getElementById('exportPdfBtn');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    
+    const icon = btn.querySelector('.btn-icon');
+    const text = btn.querySelector('.btn-text');
+    
+    icon.textContent = '📄';
+    text.textContent = 'Exportar PDF';
+}
+
+// Helper function to show success message
+function showSuccessMessage(message) {
+    const btn = document.getElementById('exportPdfBtn');
+    const icon = btn.querySelector('.btn-icon');
+    const text = btn.querySelector('.btn-text');
+    
+    icon.textContent = '✅';
+    text.textContent = message;
+    
+    setTimeout(() => {
+        icon.textContent = '📄';
+        text.textContent = 'Exportar PDF';
+    }, 3000);
+}
+
+// Helper function to truncate text
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+}

@@ -8,6 +8,7 @@ Sistema web para cargar y analizar archivos Excel con datos de reservas, proporc
 - **Análisis por Instancia**: Desglose completo de reservas por estado (Confirmada, Pendiente, Fallida, Procesando)
 - **Métricas de Conversión**: Cálculo de tasas de conversión cotizaciones/reservas
 - **Top 5 Ranking**: Visualización de las instancias con más ventas
+- **📄 Exportación a PDF**: Genera reportes completos en PDF con todos los datos, gráficos y estadísticas
 - **Diseño Responsivo**: Funciona en desktop y móviles
 
 ## 📋 Formato del Archivo Excel
@@ -84,6 +85,24 @@ Luego visita `http://localhost:8000` en tu navegador.
 3. **Top 5**: Identifica las instancias con mejor rendimiento
 4. **Ingresar Cotizaciones**: Para cada instancia, ingresa el número de cotizaciones
 5. **Ver Conversiones**: El sistema calculará automáticamente las tasas de conversión
+6. **📄 Exportar PDF**: Haz clic en el botón "Exportar PDF" para generar un reporte completo
+
+### 📥 Exportación de PDF
+
+El sistema permite generar reportes PDF profesionales que incluyen:
+
+- **Cabecera**: Título del reporte, fecha de generación y nombre del archivo cargado
+- **Resumen General**: Todas las estadísticas globales (total reservas, confirmadas, pendientes, fallidas, procesando, instancias)
+- **Top 5 Instancias**: Gráfico visual y tabla con las 5 instancias con más ventas
+- **Tasas de Conversión Globales**: Total de cotizaciones y porcentajes de conversión
+- **Detalles por Instancia**: Información completa de cada instancia:
+  - Total de reservas y desglose por estado
+  - Cantidad de cotizaciones
+  - Porcentajes de conversión (cotizaciones/total y cotizaciones/confirmadas)
+- **Pie de Página**: Números de página, timestamp de generación y marca del sistema
+
+El PDF se descarga automáticamente con un nombre único basado en la fecha y hora: `reporte-reservas-YYYY-MM-DD-HHMMSS.pdf`
+
 
 ## 📊 Métricas Calculadas
 
@@ -106,6 +125,8 @@ Luego visita `http://localhost:8000` en tu navegador.
 - **JavaScript (ES6+)**: Lógica de procesamiento
 - **SheetJS (xlsx)**: Procesamiento de archivos Excel
 - **Chart.js**: Visualización de datos
+- **jsPDF**: Generación de documentos PDF
+- **html2canvas**: Captura de gráficos para PDF
 
 ## 🔧 Dependencias
 
@@ -113,6 +134,8 @@ Las siguientes librerías se cargan desde CDN (no requieren instalación):
 
 - SheetJS (xlsx) v0.18.5
 - Chart.js v4.x
+- jsPDF v2.5.1
+- html2canvas v1.4.1
 
 ## 📱 Compatibilidad
 
