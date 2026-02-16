@@ -34,6 +34,27 @@
             <p>Procesando archivo...</p>
         </div>
 
+        <section id="filterSection" class="filter-section hidden">
+            <div class="filter-card">
+                <h3>📅 Filtrar por Fecha de Creación</h3>
+                <div class="filter-controls">
+                    <div class="filter-input-group">
+                        <label for="startDate">Desde:</label>
+                        <input type="date" id="startDate" class="date-input">
+                    </div>
+                    <div class="filter-input-group">
+                        <label for="endDate">Hasta:</label>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                    <div class="filter-buttons">
+                        <button class="btn-primary" onclick="applyDateFilter()">Aplicar Filtro</button>
+                        <button class="btn-secondary" onclick="clearDateFilter()">Limpiar Filtro</button>
+                    </div>
+                </div>
+                <div id="filterStatus" class="filter-status hidden"></div>
+            </div>
+        </section>
+
         <section id="resultsSection" class="results-section hidden">
             <!-- Overall Summary -->
             <div class="summary-card">

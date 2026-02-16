@@ -151,6 +151,100 @@ header h1 {
     display: none !important;
 }
 
+/* Filter Section */
+.filter-section {
+    margin-bottom: 30px;
+}
+
+.filter-card {
+    background: var(--card-background);
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--primary-color);
+}
+
+.filter-card h3 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    font-size: 1.3em;
+}
+
+.filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-end;
+}
+
+.filter-input-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.95em;
+}
+
+.date-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 1em;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    transition: border-color 0.3s ease;
+    font-family: inherit;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-secondary {
+    background-color: var(--text-secondary);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1em;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6c7d;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.filter-status {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), rgba(46, 204, 113, 0.1));
+    border-radius: 8px;
+    border-left: 4px solid var(--success-color);
+    font-size: 0.95em;
+    color: var(--text-primary);
+}
+
+.filter-active-icon {
+    font-size: 1.2em;
+    margin-right: 8px;
+}
+
 .results-section {
     animation: fadeIn 0.5s ease;
 }
@@ -453,5 +547,22 @@ header h1 {
     .conversion-card,
     .instance-card {
         padding: 20px;
+    }
+
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-input-group {
+        min-width: 100%;
+    }
+    
+    .filter-buttons {
+        width: 100%;
+    }
+    
+    .filter-buttons button {
+        flex: 1;
     }
 }

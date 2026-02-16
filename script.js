@@ -2,6 +2,13 @@
 let reservationData = [];
 let instancesData = {};
 let quotesData = {};
+let originalReservationData = []; // Store unfiltered data
+let dateFilter = {
+    active: false,
+    startDate: null,
+    endDate: null
+};
+let uploadedFileName = ''; // Store the Excel filename
 
 // DOM Elements
 const fileInput = document.getElementById('fileInput');
@@ -49,9 +56,11 @@ function handleFileSelect(e) {
     }
 
     fileName.textContent = `📁 Archivo seleccionado: ${file.name}`;
+    uploadedFileName = file.name; // Store filename
     hideError();
     loadingSpinner.classList.remove('hidden');
     resultsSection.classList.add('hidden');
+    document.getElementById('filterSection').classList.add('hidden'); // Hide filter section on new upload
 
     // Read the file
     const reader = new FileReader();
@@ -82,12 +91,24 @@ function processExcelFile(data) {
             return;
         }
 
+        // Store original data
+        originalReservationData = [...reservationData];
+        
+        // Reset filter state
+        dateFilter.active = false;
+        dateFilter.startDate = null;
+        dateFilter.endDate = null;
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        document.getElementById('filterStatus').classList.add('hidden');
+
         // Process data
         processReservations();
         displayResults();
         
         loadingSpinner.classList.add('hidden');
         resultsSection.classList.remove('hidden');
+        document.getElementById('filterSection').classList.remove('hidden'); // Show filter section
     } catch (error) {
         showError('Error al leer el archivo Excel: ' + error.message);
         loadingSpinner.classList.add('hidden');
@@ -355,4 +376,97 @@ function showError(message) {
 
 function hideError() {
     errorMessage.classList.add('hidden');
+}
+
+// Date filter functions
+function applyDateFilter() {
+    const startDateInput = document.getElementById('startDate').value;
+    const endDateInput = document.getElementById('endDate').value;
+    
+    if (!startDateInput || !endDateInput) {
+        showError('Por favor selecciona ambas fechas (Desde y Hasta)');
+        return;
+    }
+    
+    // Create dates at midnight UTC for consistent comparison
+    const startDate = new Date(startDateInput + 'T00:00:00Z');
+    const endDate = new Date(endDateInput + 'T23:59:59Z');
+    
+    if (startDate > endDate) {
+        showError('La fecha "Desde" debe ser anterior a la fecha "Hasta"');
+        return;
+    }
+    
+    // Activate filter
+    dateFilter.active = true;
+    dateFilter.startDate = startDate;
+    dateFilter.endDate = endDate;
+    
+    // Filter the data
+    reservationData = originalReservationData.filter(row => {
+        const fechaCreacion = row.Z; // Column Z: Fecha Creación
+        if (!fechaCreacion) return false;
+        
+        let rowDate;
+        // Handle both string dates and Excel numeric dates
+        if (typeof fechaCreacion === 'number') {
+            // Excel serial date - use standard conversion formula
+            // This works correctly for all modern dates (post-1900)
+            rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
+        } else if (typeof fechaCreacion === 'string') {
+            // Parse date format "2026-02-16 12:14:21" - extract date part only
+            const datePart = fechaCreacion.split(' ')[0]; // Get "2026-02-16"
+            rowDate = new Date(datePart + 'T00:00:00Z'); // Parse as UTC
+        } else {
+            return false;
+        }
+        
+        return rowDate >= startDate && rowDate <= endDate;
+    });
+    
+    if (reservationData.length === 0) {
+        showError('No se encontraron reservas en el rango de fechas seleccionado');
+        reservationData = [...originalReservationData];
+        return;
+    }
+    
+    // Show filter status
+    const filterStatus = document.getElementById('filterStatus');
+    filterStatus.classList.remove('hidden');
+    filterStatus.innerHTML = `
+        <span class="filter-active-icon" aria-hidden="true">✅</span>
+        <span>Mostrando <strong>${reservationData.length}</strong> reservas del 
+        <strong>${startDateInput}</strong> al <strong>${endDateInput}</strong></span>
+    `;
+    filterStatus.setAttribute('role', 'status');
+    filterStatus.setAttribute('aria-live', 'polite');
+    
+    // Reprocess and display filtered data
+    processReservations();
+    displayResults();
+    
+    hideError();
+}
+
+function clearDateFilter() {
+    // Reset filter state
+    dateFilter.active = false;
+    dateFilter.startDate = null;
+    dateFilter.endDate = null;
+    
+    // Clear date inputs
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    // Hide filter status
+    document.getElementById('filterStatus').classList.add('hidden');
+    
+    // Restore original data
+    reservationData = [...originalReservationData];
+    
+    // Reprocess and display all data
+    processReservations();
+    displayResults();
+    
+    hideError();
 }
