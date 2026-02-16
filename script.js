@@ -608,7 +608,7 @@ function addPDFTop5Table(doc, y) {
         
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 0, 0);
-        const nameText = instance.name.length > 40 ? instance.name.substring(0, 37) + '...' : instance.name;
+        const nameText = truncateText(instance.name, 40);
         doc.text(nameText, 40, y);
         
         doc.setFont('helvetica', 'bold');
@@ -700,7 +700,7 @@ async function addPDFInstanceDetails(doc, y) {
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(74, 144, 226);
-        const nameText = data.name.length > 50 ? data.name.substring(0, 47) + '...' : data.name;
+        const nameText = truncateText(data.name, 50);
         doc.text(`🏢 ${nameText}`, 15, y);
         doc.text(`Total: ${data.total}`, 190, y, { align: 'right' });
         
@@ -851,4 +851,10 @@ function showSuccessMessage(message) {
         icon.textContent = '📄';
         text.textContent = 'Exportar PDF';
     }, 3000);
+}
+
+// Helper function to truncate text
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
 }
