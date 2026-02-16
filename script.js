@@ -2,6 +2,13 @@
 let reservationData = [];
 let instancesData = {};
 let quotesData = {};
+let originalReservationData = []; // Store unfiltered data
+let uploadedFileName = ''; // Store Excel filename
+let dateFilter = {
+    active: false,
+    startDate: null,
+    endDate: null
+};
 
 // DOM Elements
 const fileInput = document.getElementById('fileInput');
@@ -81,6 +88,18 @@ function processExcelFile(data) {
             loadingSpinner.classList.add('hidden');
             return;
         }
+
+        // Store original data copy
+        originalReservationData = [...reservationData];
+        
+        // Store uploaded file name
+        const fileInputElement = document.getElementById('fileInput');
+        if (fileInputElement.files[0]) {
+            uploadedFileName = fileInputElement.files[0].name;
+        }
+
+        // Show filter section
+        document.getElementById('filterSection').classList.remove('hidden');
 
         // Process data
         processReservations();
@@ -358,18 +377,115 @@ function hideError() {
 }
 
 // ============================================
-// PDF Export Functionality
+// Date Filter Functionality
 // ============================================
 
-let currentFileName = '';
-
-// Update file name when file is selected
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        currentFileName = file.name;
+// Apply date filter
+function applyDateFilter() {
+    const startDateInput = document.getElementById('startDate').value;
+    const endDateInput = document.getElementById('endDate').value;
+    
+    if (!startDateInput || !endDateInput) {
+        showError('Por favor selecciona ambas fechas (Desde y Hasta)');
+        return;
     }
-});
+    
+    // Parse dates in local timezone
+    const startDate = new Date(startDateInput + 'T00:00:00');
+    const endDate = new Date(endDateInput + 'T23:59:59');
+    
+    if (startDate > endDate) {
+        showError('La fecha "Desde" debe ser anterior a la fecha "Hasta"');
+        return;
+    }
+    
+    // Activate filter
+    dateFilter.active = true;
+    dateFilter.startDate = startDate;
+    dateFilter.endDate = endDate;
+    
+    // Filter the data - store in temp variable first for validation
+    const filteredData = originalReservationData.filter(row => {
+        const fechaCreacion = row.Z; // Column Z
+        if (!fechaCreacion) return false;
+        
+        let rowDate;
+        // Handle both string dates and Excel serial numbers
+        if (typeof fechaCreacion === 'number') {
+            // Excel serial date: days since 1900-01-01 (25569 is the difference between Excel epoch and Unix epoch in days)
+            rowDate = new Date((fechaCreacion - 25569) * 86400 * 1000);
+        } else if (typeof fechaCreacion === 'string') {
+            // String format: "2026-02-16 12:14:21" - parse in local timezone
+            const datePart = fechaCreacion.split(' ')[0];
+            rowDate = new Date(datePart + 'T00:00:00');
+        } else {
+            return false;
+        }
+        
+        return rowDate >= startDate && rowDate <= endDate;
+    });
+    
+    // Validate filtered results before applying
+    if (filteredData.length === 0) {
+        showError('No se encontraron reservas en el rango de fechas seleccionado');
+        dateFilter.active = false;
+        return;
+    }
+    
+    // Apply the filtered data
+    reservationData = filteredData;
+    
+    // Show filter status
+    const filterStatus = document.getElementById('filterStatus');
+    filterStatus.classList.remove('hidden');
+    filterStatus.innerHTML = `
+        <span class="filter-active-icon">✅</span>
+        Mostrando <strong>${reservationData.length}</strong> reservas del 
+        <strong>${formatDate(startDate)}</strong> al <strong>${formatDate(endDate)}</strong>
+    `;
+    
+    // Reprocess and display filtered data
+    processReservations();
+    displayResults();
+    
+    hideError();
+}
+
+// Clear date filter
+function clearDateFilter() {
+    // Reset filter state
+    dateFilter.active = false;
+    dateFilter.startDate = null;
+    dateFilter.endDate = null;
+    
+    // Clear inputs
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    // Hide status
+    document.getElementById('filterStatus').classList.add('hidden');
+    
+    // Restore original data
+    reservationData = [...originalReservationData];
+    
+    // Reprocess and display
+    processReservations();
+    displayResults();
+    
+    hideError();
+}
+
+// Format date helper
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// ============================================
+// PDF Export Functionality
+// ============================================
 
 // PDF Export main function
 async function exportToPDF() {
@@ -413,12 +529,12 @@ async function exportToPDF() {
         doc.save(filename);
         
         hideExportLoading();
-        showSuccessMessage('PDF generado exitosamente');
+        showExportSuccess();
         
     } catch (error) {
         console.error('Error generating PDF:', error);
         hideExportLoading();
-        showError('Error al generar PDF: ' + error.message);
+        showExportError();
     }
 }
 
@@ -443,8 +559,15 @@ function addPDFHeader(doc, y) {
     y += 6;
     
     // File name
-    if (currentFileName) {
-        doc.text(`Archivo: ${currentFileName}`, 105, y, { align: 'center' });
+    if (uploadedFileName) {
+        doc.text(`Archivo: ${uploadedFileName}`, 105, y, { align: 'center' });
+        y += 6;
+    }
+    
+    // Filter info if active
+    if (dateFilter.active) {
+        doc.setTextColor(39, 174, 96);
+        doc.text(`Filtrado: ${formatDate(dateFilter.startDate)} - ${formatDate(dateFilter.endDate)}`, 105, y, { align: 'center' });
         y += 6;
     }
     
@@ -815,6 +938,8 @@ function getFormattedDateTime() {
 // Helper function to show export loading
 function showExportLoading() {
     const btn = document.getElementById('exportPdfBtn');
+    const exportStatus = document.getElementById('exportStatus');
+    
     btn.classList.add('loading');
     btn.disabled = true;
     
@@ -823,6 +948,9 @@ function showExportLoading() {
     
     icon.textContent = '⏳';
     text.textContent = 'Generando PDF...';
+    
+    exportStatus.textContent = '';
+    exportStatus.classList.add('hidden');
 }
 
 // Helper function to hide export loading
@@ -839,17 +967,24 @@ function hideExportLoading() {
 }
 
 // Helper function to show success message
-function showSuccessMessage(message) {
-    const btn = document.getElementById('exportPdfBtn');
-    const icon = btn.querySelector('.btn-icon');
-    const text = btn.querySelector('.btn-text');
-    
-    icon.textContent = '✅';
-    text.textContent = message;
+function showExportSuccess() {
+    const exportStatus = document.getElementById('exportStatus');
+    exportStatus.textContent = '✅ PDF generado exitosamente';
+    exportStatus.classList.remove('hidden');
     
     setTimeout(() => {
-        icon.textContent = '📄';
-        text.textContent = 'Exportar PDF';
+        exportStatus.classList.add('hidden');
+    }, 3000);
+}
+
+// Helper function to show error message
+function showExportError() {
+    const exportStatus = document.getElementById('exportStatus');
+    exportStatus.textContent = '❌ Error al generar PDF';
+    exportStatus.classList.remove('hidden');
+    
+    setTimeout(() => {
+        exportStatus.classList.add('hidden');
     }, 3000);
 }
 
