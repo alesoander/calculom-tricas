@@ -113,42 +113,78 @@ function processExcelFile(data) {
     }
 }
 
-// Process reservation data
+// Helper: parse a cell value as a number, returning 0 if not numeric
+function parseNumeric(val) {
+    const n = parseFloat(val);
+    return isNaN(n) ? 0 : n;
+}
+
+// Helper: normalise a Yes/No-style cell to a display string
+function parseBool(val) {
+    if (val === undefined || val === null || val === '') return '—';
+    return String(val).trim();
+}
+
+// Process data with the new A→AK column schema
 function processReservations() {
     instancesData = {};
 
     reservationData.forEach(row => {
-        const instancia = row.B || 'Sin Instancia';
-        const estadoReserva = (row.U || '').trim();
+        // Column B = Conexión is the primary key for each connection/instance
+        const conexion = (row.B || 'Sin Conexión').toString().trim();
 
-        if (!instancesData[instancia]) {
-            instancesData[instancia] = {
-                name: instancia,
-                confirmada: 0,
-                pendiente: 0,
-                fallida: 0,
-                procesando: 0,
-                total: 0,
-                quotes: 0
-            };
-        }
+        instancesData[conexion] = {
+            // Identity
+            name: conexion,
+            cliente: (row.A || '').toString().trim(),
+            estado: (row.C || '').toString().trim(),
+            api: (row.D || '').toString().trim(),
+            equipo: (row.F || '').toString().trim(),
+            plataforma: (row.G || '').toString().trim(),
 
-        // Count by status (case-insensitive comparison)
-        const estadoLower = estadoReserva.toLowerCase();
-        if (estadoLower === 'confirmada') {
-            instancesData[instancia].confirmada++;
-        } else if (estadoLower === 'pendiente') {
-            instancesData[instancia].pendiente++;
-        } else if (estadoLower === 'fallida') {
-            instancesData[instancia].fallida++;
-        } else if (estadoLower === 'procesando') {
-            instancesData[instancia].procesando++;
-        }
+            // Monthly metrics
+            conversacionesMensual: parseNumeric(row.H),
+            cantidadSeguimiento: parseNumeric(row.P),
+            clicksReservaMensual: parseNumeric(row.R),
 
-        instancesData[instancia].total++;
+            // Feature flags
+            automatizacion: parseBool(row.I),
+            redesSociales: parseBool(row.J),
+            preDisp: parseBool(row.K),
+            disponible247: parseBool(row.L),
+            convAutoManual: parseBool(row.M),
+            seguimiento1: parseBool(row.N),
+            seguimiento2: parseBool(row.O),
+            campana: parseBool(row.Q),
+            motor: parseBool(row.S),
+            primerPausaModificado: parseBool(row.T),
+            segundaPausaActivado: parseBool(row.U),
+            entrenamientosFaltantes: parseBool(row.V),
+            esMulticomplejo: parseBool(row.W),
+            correoAlertas: parseBool(row.X),
+            progresoCompletado: parseBool(row.Y),
+
+            // Reviews
+            reviewsTotal: parseNumeric(row.Z),
+            reviewsCorregido: parseNumeric(row.AA),
+            reviewsRecibido: parseNumeric(row.AB),
+            reviewsPendiente: parseNumeric(row.AC),
+            reviewsIrresoluble: parseNumeric(row.AD),
+            reviewsErrorCount: parseNumeric(row.AE),
+            reviewsErrorRate: parseNumeric(row.AF),
+
+            // Support & surveys
+            nivelSoporte: (row.AG || '').toString().trim(),
+            pruebasCliente: parseBool(row.AH),
+            calificacionEncuesta: parseNumeric(row.AI),
+            respuestasEncuesta: parseNumeric(row.AJ),
+            ultimaDesconexion: (row.AK || '').toString().trim(),
+
+            total: 1
+        };
     });
 
-    // Initialize quotes data
+    // Keep quotes data consistent (not used in new schema but preserved for PDF export)
     Object.keys(instancesData).forEach(instance => {
         if (!quotesData[instance]) {
             quotesData[instance] = 0;
@@ -166,32 +202,30 @@ function displayResults() {
 
 // Display overall summary
 function displayOverallSummary() {
-    let totalReservations = 0;
-    let totalConfirmed = 0;
-    let totalPending = 0;
-    let totalFailed = 0;
-    let totalProcessing = 0;
+    const clients = Object.values(instancesData);
 
-    Object.values(instancesData).forEach(instance => {
-        totalReservations += instance.total;
-        totalConfirmed += instance.confirmada;
-        totalPending += instance.pendiente;
-        totalFailed += instance.fallida;
-        totalProcessing += instance.procesando;
-    });
+    const totalClients = clients.length;
+    const totalConversaciones = clients.reduce((s, c) => s + c.conversacionesMensual, 0);
+    const totalClicksReserva = clients.reduce((s, c) => s + c.clicksReservaMensual, 0);
+    const totalReviews = clients.reduce((s, c) => s + c.reviewsTotal, 0);
 
-    document.getElementById('totalReservations').textContent = totalReservations;
-    document.getElementById('totalConfirmed').textContent = totalConfirmed;
-    document.getElementById('totalPending').textContent = totalPending;
-    document.getElementById('totalFailed').textContent = totalFailed;
-    document.getElementById('totalProcessing').textContent = totalProcessing;
+    const calificaciones = clients.filter(c => c.calificacionEncuesta > 0);
+    const avgCalificacion = calificaciones.length > 0
+        ? (calificaciones.reduce((s, c) => s + c.calificacionEncuesta, 0) / calificaciones.length).toFixed(2)
+        : '—';
+
+    document.getElementById('totalReservations').textContent = totalClients;
+    document.getElementById('totalConfirmed').textContent = totalConversaciones.toLocaleString('es-ES');
+    document.getElementById('totalPending').textContent = totalClicksReserva.toLocaleString('es-ES');
+    document.getElementById('totalFailed').textContent = totalReviews.toLocaleString('es-ES');
+    document.getElementById('totalProcessing').textContent = avgCalificacion;
     document.getElementById('totalInstances').textContent = Object.keys(instancesData).length;
 }
 
 // Display top 5 instances
 function displayTop5Instances() {
     const sortedInstances = Object.values(instancesData)
-        .sort((a, b) => b.total - a.total)
+        .sort((a, b) => b.conversacionesMensual - a.conversacionesMensual)
         .slice(0, 5);
 
     // Create chart
@@ -205,10 +239,10 @@ function displayTop5Instances() {
     window.top5Chart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: sortedInstances.map(i => i.name),
+            labels: sortedInstances.map(i => i.cliente || i.name),
             datasets: [{
-                label: 'Total de Reservas',
-                data: sortedInstances.map(i => i.total),
+                label: 'Conversaciones Mensuales',
+                data: sortedInstances.map(i => i.conversacionesMensual),
                 backgroundColor: [
                     'rgba(74, 144, 226, 0.8)',
                     'rgba(52, 152, 219, 0.8)',
@@ -250,81 +284,212 @@ function displayTop5Instances() {
     top5Table.innerHTML = sortedInstances.map((instance, index) => `
         <div class="top5-row">
             <div class="top5-rank">#${index + 1}</div>
-            <div class="top5-name">${instance.name}</div>
-            <div class="top5-count">${instance.total} reservas</div>
+            <div class="top5-name">${instance.cliente || instance.name}</div>
+            <div class="top5-count">${instance.conversacionesMensual.toLocaleString('es-ES')} conv.</div>
         </div>
     `).join('');
 }
 
-// Display global conversion
+// Display global metrics summary (replaces old conversion section)
 function displayGlobalConversion() {
-    const totalQuotesInput = document.getElementById('totalQuotes');
-    
-    totalQuotesInput.addEventListener('input', updateGlobalConversion);
     updateGlobalConversion();
 }
 
 function updateGlobalConversion() {
+    const clients = Object.values(instancesData);
     const totalQuotes = parseInt(document.getElementById('totalQuotes').value) || 0;
-    const totalConfirmed = Object.values(instancesData)
-        .reduce((sum, instance) => sum + instance.confirmada, 0);
 
-    const conversionRate = totalConfirmed > 0 
-        ? ((totalQuotes / totalConfirmed) * 100).toFixed(2)
+    // Avg reviews error rate
+    const withRate = clients.filter(c => c.reviewsErrorRate > 0);
+    const avgErrorRate = withRate.length > 0
+        ? (withRate.reduce((s, c) => s + c.reviewsErrorRate, 0) / withRate.length).toFixed(2)
+        : 0;
+
+    // Total confirmed = totalConversaciones for global conversion calc
+    const totalConversaciones = clients.reduce((s, c) => s + c.conversacionesMensual, 0);
+    const conversionRate = totalConversaciones > 0 && totalQuotes > 0
+        ? ((totalConversaciones / totalQuotes) * 100).toFixed(2)
         : '0.00';
 
     document.getElementById('globalConversionRate').textContent = `${conversionRate}%`;
+    
+    // Show avg error rate if element exists
+    const avgErrorEl = document.getElementById('avgErrorRate');
+    if (avgErrorEl) avgErrorEl.textContent = `${avgErrorRate}%`;
 }
 
 // Display instance details
 function displayInstanceDetails() {
     const container = document.getElementById('instancesContainer');
-    
-    // Sort instances by total reservations
-    const sortedInstances = Object.entries(instancesData)
-        .sort(([, a], [, b]) => b.total - a.total);
 
-    container.innerHTML = sortedInstances.map(([instanceName, data]) => `
+    // Sort by conversaciones mensuales desc
+    const sortedInstances = Object.entries(instancesData)
+        .sort(([, a], [, b]) => b.conversacionesMensual - a.conversacionesMensual);
+
+    container.innerHTML = sortedInstances.map(([, data]) => `
         <div class="instance-card">
             <div class="instance-header">
-                <div class="instance-name">🏢 ${data.name}</div>
-                <div class="instance-total">Total: ${data.total}</div>
+                <div class="instance-name">🏢 ${data.cliente || data.name}</div>
+                <div class="instance-total">Conexión: ${data.name}</div>
             </div>
 
+            <!-- Identity -->
             <div class="instance-stats">
                 <div class="stat-item">
-                    <span class="stat-label">✅ Confirmada:</span>
-                    <span class="stat-value confirmed">${data.confirmada}</span>
+                    <span class="stat-label">📡 Estado:</span>
+                    <span class="stat-value">${data.estado || '—'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🔌 API:</span>
+                    <span class="stat-value">${data.api || '—'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">👥 Equipo:</span>
+                    <span class="stat-value">${data.equipo || '—'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📱 Plataforma:</span>
+                    <span class="stat-value">${data.plataforma || '—'}</span>
+                </div>
+            </div>
+
+            <!-- Monthly metrics -->
+            <div class="instance-section-title">📊 Métricas Mensuales</div>
+            <div class="instance-stats">
+                <div class="stat-item">
+                    <span class="stat-label">💬 Conversaciones:</span>
+                    <span class="stat-value confirmed">${data.conversacionesMensual.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🔁 Seguimientos:</span>
+                    <span class="stat-value">${data.cantidadSeguimiento.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🖱️ Clicks Reserva:</span>
+                    <span class="stat-value">${data.clicksReservaMensual.toLocaleString('es-ES')}</span>
+                </div>
+            </div>
+
+            <!-- Feature flags -->
+            <div class="instance-section-title">⚙️ Configuración</div>
+            <div class="instance-stats flags-grid">
+                <div class="stat-item">
+                    <span class="stat-label">🤖 Automatización:</span>
+                    <span class="stat-value">${data.automatizacion}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📲 Redes Sociales:</span>
+                    <span class="stat-value">${data.redesSociales}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📋 Pre/Dispo:</span>
+                    <span class="stat-value">${data.preDisp}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🕐 24/7:</span>
+                    <span class="stat-value">${data.disponible247}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🔀 Conv. Auto/Manual:</span>
+                    <span class="stat-value">${data.convAutoManual}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📬 Seguimiento 1:</span>
+                    <span class="stat-value">${data.seguimiento1}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📬 Seguimiento 2:</span>
+                    <span class="stat-value">${data.seguimiento2}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📢 Campaña:</span>
+                    <span class="stat-value">${data.campana}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">⚙️ Motor:</span>
+                    <span class="stat-value">${data.motor}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">⏸️ Pausa 1 Mod.:</span>
+                    <span class="stat-value">${data.primerPausaModificado}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">⏸️ Pausa 2 Act.:</span>
+                    <span class="stat-value">${data.segundaPausaActivado}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🎓 Entrenam. Faltantes:</span>
+                    <span class="stat-value">${data.entrenamientosFaltantes}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🏬 Multicomplejo:</span>
+                    <span class="stat-value">${data.esMulticomplejo}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📧 Correo Alertas:</span>
+                    <span class="stat-value">${data.correoAlertas}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">✅ Progreso Completado:</span>
+                    <span class="stat-value">${data.progresoCompletado}</span>
+                </div>
+            </div>
+
+            <!-- Reviews -->
+            <div class="instance-section-title">⭐ Reviews</div>
+            <div class="instance-stats">
+                <div class="stat-item">
+                    <span class="stat-label">📊 Total:</span>
+                    <span class="stat-value">${data.reviewsTotal.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">✔️ Corregido:</span>
+                    <span class="stat-value confirmed">${data.reviewsCorregido.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📥 Recibido:</span>
+                    <span class="stat-value">${data.reviewsRecibido.toLocaleString('es-ES')}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">⏳ Pendiente:</span>
-                    <span class="stat-value pending">${data.pendiente}</span>
+                    <span class="stat-value pending">${data.reviewsPendiente.toLocaleString('es-ES')}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">❌ Fallida:</span>
-                    <span class="stat-value failed">${data.fallida}</span>
+                    <span class="stat-label">🔒 Irresoluble:</span>
+                    <span class="stat-value failed">${data.reviewsIrresoluble.toLocaleString('es-ES')}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">🔄 Procesando:</span>
-                    <span class="stat-value processing">${data.procesando}</span>
+                    <span class="stat-label">❌ Error Count:</span>
+                    <span class="stat-value failed">${data.reviewsErrorCount.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📉 Error Rate:</span>
+                    <span class="stat-value ${data.reviewsErrorRate > 0 ? 'failed' : ''}">${data.reviewsErrorRate}%</span>
                 </div>
             </div>
 
-            <div class="instance-conversion">
-                <div class="quote-input-section">
-                    <label>💼 Cantidad de Cotizaciones para esta instancia:</label>
-                    <input 
-                        type="number" 
-                        class="quote-input" 
-                        data-instance="${instanceName}"
-                        value="${quotesData[instanceName] || 0}"
-                        min="0"
-                        onchange="updateInstanceConversion('${instanceName}')"
-                    >
+            <!-- Support & survey -->
+            <div class="instance-section-title">🎯 Soporte & Encuesta</div>
+            <div class="instance-stats">
+                <div class="stat-item">
+                    <span class="stat-label">🛡️ Nivel de Soporte:</span>
+                    <span class="stat-value">${data.nivelSoporte || '—'}</span>
                 </div>
-
-                <div class="conversion-results" id="conversion-${instanceName}">
-                    ${getConversionHTML(instanceName, quotesData[instanceName] || 0)}
+                <div class="stat-item">
+                    <span class="stat-label">🧪 Pruebas del Cliente:</span>
+                    <span class="stat-value">${data.pruebasCliente}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">⭐ Calificación Encuesta:</span>
+                    <span class="stat-value confirmed">${data.calificacionEncuesta > 0 ? data.calificacionEncuesta : '—'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📝 Respuestas Encuesta:</span>
+                    <span class="stat-value">${data.respuestasEncuesta.toLocaleString('es-ES')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">📵 Última Desconexión WA:</span>
+                    <span class="stat-value">${data.ultimaDesconexion || '—'}</span>
                 </div>
             </div>
         </div>
@@ -333,37 +498,18 @@ function displayInstanceDetails() {
 
 function getConversionHTML(instanceName, quotes) {
     const data = instancesData[instanceName];
-    
-    const rate1 = quotes > 0 
-        ? ((data.total / quotes) * 100).toFixed(2)
-        : '0.00';
-    
-    const rate2 = quotes > 0 
-        ? ((data.confirmada / quotes) * 100).toFixed(2)
+    if (!data) return '';
+
+    const rate1 = quotes > 0
+        ? ((data.conversacionesMensual / quotes) * 100).toFixed(2)
         : '0.00';
 
     return `
         <div class="conversion-result-item">
-            <span class="conversion-result-label">Total Reservas / Cotizaciones:</span>
+            <span class="conversion-result-label">Conversaciones Mensuales / Cotizaciones:</span>
             <span class="conversion-result-value">${rate1}%</span>
         </div>
-        <div class="conversion-result-item">
-            <span class="conversion-result-label">Confirmadas / Cotizaciones:</span>
-            <span class="conversion-result-value">${rate2}%</span>
-        </div>
     `;
-}
-
-function updateInstanceConversion(instanceName) {
-    const input = document.querySelector(`input[data-instance="${instanceName}"]`);
-    const quotes = parseInt(input.value) || 0;
-    quotesData[instanceName] = quotes;
-
-    const conversionContainer = document.getElementById(`conversion-${instanceName}`);
-    conversionContainer.innerHTML = getConversionHTML(instanceName, quotes);
-
-    // Update global conversion as well
-    updateGlobalConversion();
 }
 
 // Error handling
@@ -406,7 +552,7 @@ function applyDateFilter() {
     
     // Filter the data - store in temp variable first for validation
     const filteredData = originalReservationData.filter(row => {
-        const fechaCreacion = row.Z; // Column Z
+        const fechaCreacion = row.E; // Column E = Fecha Creación
         if (!fechaCreacion) return false;
         
         let rowDate;
@@ -427,7 +573,7 @@ function applyDateFilter() {
     
     // Validate filtered results before applying
     if (filteredData.length === 0) {
-        showError('No se encontraron reservas en el rango de fechas seleccionado');
+        showError('No se encontraron registros en el rango de fechas seleccionado');
         dateFilter.active = false;
         return;
     }
@@ -440,7 +586,7 @@ function applyDateFilter() {
     filterStatus.classList.remove('hidden');
     filterStatus.innerHTML = `
         <span class="filter-active-icon">✅</span>
-        Mostrando <strong>${reservationData.length}</strong> reservas del 
+        Mostrando <strong>${reservationData.length}</strong> registros del 
         <strong>${formatDate(startDate)}</strong> al <strong>${formatDate(endDate)}</strong>
     `;
     
@@ -525,7 +671,7 @@ async function exportToPDF() {
         addPDFFooter(doc);
         
         // Generate filename and download
-        const filename = `reporte-reservas-${getFormattedDateTime()}.pdf`;
+        const filename = `reporte-metricas-${getFormattedDateTime()}.pdf`;
         doc.save(filename);
         
         hideExportLoading();
@@ -544,7 +690,7 @@ function addPDFHeader(doc, y) {
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(74, 144, 226);
-    doc.text('Análisis de Reservas - Reporte', 105, y, { align: 'center' });
+    doc.text('Análisis de Métricas de Clientes - Reporte', 105, y, { align: 'center' });
     
     y += 10;
     
@@ -588,50 +734,53 @@ function addPDFSummary(doc, y) {
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text('📈 Resumen General', 15, y);
-    
+    doc.text('Resumen General', 15, y);
+
     y += 8;
-    
-    const totalReservations = parseInt(document.getElementById('totalReservations').textContent);
-    const totalConfirmed = parseInt(document.getElementById('totalConfirmed').textContent);
-    const totalPending = parseInt(document.getElementById('totalPending').textContent);
-    const totalFailed = parseInt(document.getElementById('totalFailed').textContent);
-    const totalProcessing = parseInt(document.getElementById('totalProcessing').textContent);
-    const totalInstances = parseInt(document.getElementById('totalInstances').textContent);
-    
+
+    const clients = Object.values(instancesData);
+    const totalClients = clients.length;
+    const totalConversaciones = clients.reduce((s, c) => s + c.conversacionesMensual, 0);
+    const totalClicksReserva = clients.reduce((s, c) => s + c.clicksReservaMensual, 0);
+    const totalReviews = clients.reduce((s, c) => s + c.reviewsTotal, 0);
+    const calificaciones = clients.filter(c => c.calificacionEncuesta > 0);
+    const avgCalificacion = calificaciones.length > 0
+        ? (calificaciones.reduce((s, c) => s + c.calificacionEncuesta, 0) / calificaciones.length).toFixed(2)
+        : '—';
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    
+
     const summaryData = [
-        { label: 'Total Reservas:', value: totalReservations, color: [74, 144, 226] },
-        { label: 'Reservas Confirmadas:', value: totalConfirmed, color: [39, 174, 96] },
-        { label: 'Reservas Pendientes:', value: totalPending, color: [243, 156, 18] },
-        { label: 'Reservas Fallidas:', value: totalFailed, color: [231, 76, 60] },
-        { label: 'Reservas Procesando:', value: totalProcessing, color: [155, 89, 182] },
-        { label: 'Total Instancias:', value: totalInstances, color: [74, 144, 226] }
+        { label: 'Total Clientes:', value: totalClients, color: [74, 144, 226] },
+        { label: 'Conversaciones (Mensual):', value: totalConversaciones.toLocaleString('es-ES'), color: [39, 174, 96] },
+        { label: 'Clicks Reserva (Mensual):', value: totalClicksReserva.toLocaleString('es-ES'), color: [243, 156, 18] },
+        { label: 'Reviews Total:', value: totalReviews.toLocaleString('es-ES'), color: [74, 144, 226] },
+        { label: 'Prom. Calificacion Encuesta:', value: avgCalificacion, color: [155, 89, 182] },
+        { label: 'Total Conexiones:', value: Object.keys(instancesData).length, color: [74, 144, 226] }
     ];
-    
+
     summaryData.forEach((item, index) => {
         const xLeft = 15 + (index % 2) * 90;
         const yRow = y + Math.floor(index / 2) * 12;
-        
+
         // Box background
         doc.setFillColor(245, 247, 250);
         doc.rect(xLeft, yRow - 5, 85, 10, 'F');
-        
+
         // Label
         doc.setTextColor(127, 140, 141);
         doc.text(item.label, xLeft + 2, yRow);
-        
+
         // Value
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...item.color);
         doc.text(item.value.toString(), xLeft + 80, yRow, { align: 'right' });
         doc.setFont('helvetica', 'normal');
     });
-    
+
     y += 45;
-    
+
     return y;
 }
 
@@ -647,7 +796,7 @@ async function addPDFChart(doc, y) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text('🏆 Top 5 Instancias con Más Ventas', 15, y);
+        doc.text('Top 5 Clientes por Conversaciones Mensuales', 15, y);
         
         y += 8;
         
@@ -684,19 +833,19 @@ async function addPDFChart(doc, y) {
 // Helper function to add Top 5 table
 function addPDFTop5Table(doc, y) {
     const sortedInstances = Object.values(instancesData)
-        .sort((a, b) => b.total - a.total)
+        .sort((a, b) => b.conversacionesMensual - a.conversacionesMensual)
         .slice(0, 5);
-    
+
     if (sortedInstances.length === 0) return y;
-    
+
     // Check if we need a new page
     if (y > 220) {
         doc.addPage();
         y = 20;
     }
-    
+
     y += 5;
-    
+
     // Table header
     doc.setFillColor(74, 144, 226);
     doc.rect(15, y - 5, 180, 8, 'F');
@@ -704,69 +853,71 @@ function addPDFTop5Table(doc, y) {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text('Rank', 20, y);
-    doc.text('Instancia', 40, y);
-    doc.text('Total Reservas', 170, y, { align: 'right' });
-    
+    doc.text('Cliente', 40, y);
+    doc.text('Conv. Mensual', 170, y, { align: 'right' });
+
     y += 8;
-    
+
     // Table rows
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    
+
     sortedInstances.forEach((instance, index) => {
         if (y > 270) {
             doc.addPage();
             y = 20;
         }
-        
+
         // Alternating row colors
         if (index % 2 === 0) {
             doc.setFillColor(245, 247, 250);
             doc.rect(15, y - 5, 180, 8, 'F');
         }
-        
+
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(74, 144, 226);
         doc.text(`#${index + 1}`, 20, y);
-        
+
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 0, 0);
-        const nameText = truncateText(instance.name, 40);
+        const nameText = truncateText(instance.cliente || instance.name, 40);
         doc.text(nameText, 40, y);
-        
+
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(39, 174, 96);
-        doc.text(instance.total.toString(), 170, y, { align: 'right' });
-        
+        doc.text(instance.conversacionesMensual.toLocaleString('es-ES'), 170, y, { align: 'right' });
+
         y += 8;
     });
-    
+
     y += 5;
-    
+
     return y;
 }
 
-// Helper function to add global conversion rates
+// Helper function to add global metrics
 function addPDFGlobalConversion(doc, y) {
     // Check if we need a new page
     if (y > 240) {
         doc.addPage();
         y = 20;
     }
-    
+
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text('📊 Tasas de Conversión Globales', 15, y);
-    
+    doc.text('Metricas Globales de Conversion', 15, y);
+
     y += 8;
-    
+
     const totalQuotes = parseInt(document.getElementById('totalQuotes').value) || 0;
     const globalConversionRate = document.getElementById('globalConversionRate').textContent;
-    
+    const avgErrorRateEl = document.getElementById('avgErrorRate');
+    const avgErrorRate = avgErrorRateEl ? avgErrorRateEl.textContent : '0.00%';
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    
+
     // Total de Cotizaciones
     doc.setFillColor(245, 247, 250);
     doc.rect(15, y - 5, 180, 10, 'F');
@@ -775,21 +926,33 @@ function addPDFGlobalConversion(doc, y) {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(74, 144, 226);
     doc.text(totalQuotes.toString(), 190, y, { align: 'right' });
-    
+
     y += 12;
-    
+
     // Conversion Rate
     doc.setFont('helvetica', 'normal');
     doc.setFillColor(245, 247, 250);
     doc.rect(15, y - 5, 180, 10, 'F');
     doc.setTextColor(127, 140, 141);
-    doc.text('Total Cotizaciones / Total Confirmadas:', 17, y);
+    doc.text('Conversaciones Mensuales / Cotizaciones:', 17, y);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(74, 144, 226);
     doc.text(globalConversionRate, 190, y, { align: 'right' });
-    
+
+    y += 12;
+
+    // Avg error rate
+    doc.setFont('helvetica', 'normal');
+    doc.setFillColor(245, 247, 250);
+    doc.rect(15, y - 5, 180, 10, 'F');
+    doc.setTextColor(127, 140, 141);
+    doc.text('Promedio Reviews Error Rate:', 17, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(231, 76, 60);
+    doc.text(avgErrorRate, 190, y, { align: 'right' });
+
     y += 15;
-    
+
     return y;
 }
 
@@ -800,100 +963,114 @@ async function addPDFInstanceDetails(doc, y) {
         doc.addPage();
         y = 20;
     }
-    
+
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text('🏢 Detalles por Instancia', 15, y);
-    
+    doc.text('Detalles por Conexion', 15, y);
+
     y += 10;
-    
-    // Sort instances by total reservations
+
+    // Sort by conversaciones mensuales desc
     const sortedInstances = Object.entries(instancesData)
-        .sort(([, a], [, b]) => b.total - a.total);
-    
-    for (const [instanceName, data] of sortedInstances) {
+        .sort(([, a], [, b]) => b.conversacionesMensual - a.conversacionesMensual);
+
+    for (const [, data] of sortedInstances) {
         // Check if we need a new page
-        if (y > 230) {
+        if (y > 220) {
             doc.addPage();
             y = 20;
         }
-        
-        // Instance name and total
+
+        // Client name and connection
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(74, 144, 226);
-        const nameText = truncateText(data.name, 50);
-        doc.text(`🏢 ${nameText}`, 15, y);
-        doc.text(`Total: ${data.total}`, 190, y, { align: 'right' });
-        
-        y += 8;
-        
-        // Status breakdown
-        doc.setFontSize(10);
+        const clientText = truncateText(data.cliente || data.name, 45);
+        doc.text(clientText, 15, y);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        
-        const statusData = [
-            { label: 'Confirmada:', value: data.confirmada, color: [39, 174, 96], emoji: '✅' },
-            { label: 'Pendiente:', value: data.pendiente, color: [243, 156, 18], emoji: '⏳' },
-            { label: 'Fallida:', value: data.fallida, color: [231, 76, 60], emoji: '❌' },
-            { label: 'Procesando:', value: data.procesando, color: [155, 89, 182], emoji: '🔄' }
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Conexion: ${truncateText(data.name, 30)}`, 15, y + 5);
+
+        y += 12;
+
+        // Identity row
+        doc.setFontSize(9);
+        const identityData = [
+            { label: 'Estado:', value: data.estado || '—' },
+            { label: 'API:', value: data.api || '—' },
+            { label: 'Equipo:', value: data.equipo || '—' },
+            { label: 'Nivel Soporte:', value: data.nivelSoporte || '—' }
         ];
-        
-        statusData.forEach((status, index) => {
-            const xPos = 20 + (index % 2) * 90;
-            const yPos = y + Math.floor(index / 2) * 8;
-            
-            doc.setTextColor(127, 140, 141);
-            doc.text(`${status.emoji} ${status.label}`, xPos, yPos);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...status.color);
-            doc.text(status.value.toString(), xPos + 80, yPos, { align: 'right' });
+        identityData.forEach((item, i) => {
+            const xPos = 15 + (i % 2) * 90;
+            const yPos = y + Math.floor(i / 2) * 7;
             doc.setFont('helvetica', 'normal');
+            doc.setTextColor(127, 140, 141);
+            doc.text(`${item.label}`, xPos, yPos);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text(truncateText(item.value, 20), xPos + 30, yPos);
         });
-        
-        y += 20;
-        
-        // Quote information
-        const quotes = quotesData[instanceName] || 0;
-        const rate1 = quotes > 0 ? ((data.total / quotes) * 100).toFixed(2) : '0.00';
-        const rate2 = quotes > 0 ? ((data.confirmada / quotes) * 100).toFixed(2) : '0.00';
-        
+
+        y += 16;
+
+        // Monthly metrics
+        if (y > 270) { doc.addPage(); y = 20; }
         doc.setFillColor(245, 247, 250);
-        doc.rect(15, y - 5, 180, 20, 'F');
-        
+        doc.rect(15, y - 4, 180, 8, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(127, 140, 141);
-        doc.text('💼 Cantidad de Cotizaciones:', 17, y);
+        doc.text('Conv. Mensual:', 17, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(39, 174, 96);
+        doc.text(data.conversacionesMensual.toLocaleString('es-ES'), 70, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(127, 140, 141);
+        doc.text('Clicks Reserva:', 100, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(243, 156, 18);
+        doc.text(data.clicksReservaMensual.toLocaleString('es-ES'), 145, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(127, 140, 141);
+        doc.text('Seguimientos:', 160, y);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(74, 144, 226);
-        doc.text(quotes.toString(), 190, y, { align: 'right' });
-        
-        y += 6;
-        
+        doc.text(data.cantidadSeguimiento.toLocaleString('es-ES'), 192, y, { align: 'right' });
+
+        y += 10;
+
+        // Reviews row
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.setFillColor(250, 245, 245);
+        doc.rect(15, y - 4, 180, 8, 'F');
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(127, 140, 141);
-        doc.text('Total Reservas / Cotizaciones:', 17, y);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${rate1}%`, 190, y, { align: 'right' });
-        
-        y += 6;
-        
+        doc.text(`Reviews: Total=${data.reviewsTotal}  Corregido=${data.reviewsCorregido}  Recibido=${data.reviewsRecibido}  Pendiente=${data.reviewsPendiente}  Error=${data.reviewsErrorRate}%`, 17, y);
+
+        y += 10;
+
+        // Survey row
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.setFillColor(245, 250, 245);
+        doc.rect(15, y - 4, 180, 8, 'F');
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(127, 140, 141);
-        doc.text('Confirmadas / Cotizaciones:', 17, y);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${rate2}%`, 190, y, { align: 'right' });
-        
-        y += 12;
-        
+        const calif = data.calificacionEncuesta > 0 ? data.calificacionEncuesta : '—';
+        doc.text(`Calif. Encuesta: ${calif}  |  Respuestas: ${data.respuestasEncuesta}  |  Ult. Desconexion WA: ${truncateText(data.ultimaDesconexion || '—', 25)}`, 17, y);
+
+        y += 10;
+
         // Separator line
         doc.setDrawColor(225, 232, 237);
         doc.setLineWidth(0.3);
         doc.line(15, y, 195, y);
-        
-        y += 8;
+
+        y += 6;
     }
-    
+
     return y;
 }
 
