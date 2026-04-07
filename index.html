@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análisis de Métricas de Clientes - Calculom-tricas</title>
+    <title>Análisis de Reservas - Calculom-tricas</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -13,8 +13,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>📊 Análisis de Métricas de Clientes</h1>
-            <p class="subtitle">Sistema de análisis y métricas de conexiones por instancia</p>
+            <h1>📊 Análisis de Reservas</h1>
+            <p class="subtitle">Sistema de análisis y métricas de reservas por instancia</p>
         </header>
 
         <section class="upload-section">
@@ -73,27 +73,27 @@
                 <h2>📈 Resumen General</h2>
                 <div class="summary-grid">
                     <div class="summary-item">
-                        <span class="summary-label">Total Clientes:</span>
+                        <span class="summary-label">Total Reservas:</span>
                         <span class="summary-value" id="totalReservations">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Conversaciones (Mensual):</span>
+                        <span class="summary-label">Reservas Confirmadas:</span>
                         <span class="summary-value confirmed" id="totalConfirmed">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Clicks Reserva (Mensual):</span>
+                        <span class="summary-label">Reservas Pendientes:</span>
                         <span class="summary-value pending" id="totalPending">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Reviews Total:</span>
-                        <span class="summary-value" id="totalFailed">0</span>
+                        <span class="summary-label">Reservas Fallidas:</span>
+                        <span class="summary-value failed" id="totalFailed">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Prom. Calificación Encuesta:</span>
-                        <span class="summary-value processing" id="totalProcessing">—</span>
+                        <span class="summary-label">Reservas Procesando:</span>
+                        <span class="summary-value processing" id="totalProcessing">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Total Conexiones:</span>
+                        <span class="summary-label">Total Instancias:</span>
                         <span class="summary-value" id="totalInstances">0</span>
                     </div>
                 </div>
@@ -101,33 +101,29 @@
 
             <!-- Top 5 Instances -->
             <div class="chart-card">
-                <h2>🏆 Top 5 Clientes por Conversaciones Mensuales</h2>
+                <h2>🏆 Top 5 Instancias con Más Ventas</h2>
                 <canvas id="top5Chart"></canvas>
                 <div id="top5Table" class="top5-table"></div>
             </div>
 
-            <!-- Global Metrics Section -->
+            <!-- Global Conversion Rates -->
             <div class="conversion-card">
-                <h2>📊 Métricas Globales de Conversión</h2>
+                <h2>📊 Tasas de Conversión Globales</h2>
                 <div class="conversion-grid">
                     <div class="conversion-item">
                         <label for="totalQuotes">Total de Cotizaciones:</label>
-                        <input type="number" id="totalQuotes" class="quote-input" min="0" value="0" oninput="updateGlobalConversion()">
+                        <input type="number" id="totalQuotes" class="quote-input" min="0" value="0">
                     </div>
                     <div class="conversion-item">
-                        <span class="conversion-label">Conversaciones Mensuales / Cotizaciones:</span>
+                        <span class="conversion-label">Total Cotizaciones / Total Confirmadas:</span>
                         <span class="conversion-value" id="globalConversionRate">0.00%</span>
-                    </div>
-                    <div class="conversion-item">
-                        <span class="conversion-label">Promedio Reviews Error Rate:</span>
-                        <span class="conversion-value" id="avgErrorRate">0.00%</span>
                     </div>
                 </div>
             </div>
 
             <!-- Instance Details -->
             <div class="instances-section">
-                <h2>🏢 Detalles por Conexión</h2>
+                <h2>🏢 Detalles por Instancia</h2>
                 <div id="instancesContainer"></div>
             </div>
         </section>
